@@ -7,6 +7,7 @@ import shutil
 import time
 import unicodedata
 from pathlib import Path
+import json
 
 from icloudpy import exceptions
 
@@ -74,17 +75,6 @@ def generate_file_name(photo, file_size, destination_path, folder_format):
     """Generate full path to file."""
     filename = photo.filename
     name, extension = get_name_and_extension(photo, file_size)
-    file_path = os.path.join(destination_path, filename)
-    file_size_path = os.path.join(
-        destination_path,
-        f'{"__".join([name, file_size])}' if extension == "" else f'{"__".join([name, file_size])}.{extension}',
-    )
-    file_size_id_path = os.path.join(
-        destination_path,
-        f'{"__".join([name, file_size, base64.urlsafe_b64encode(photo.id.encode()).decode()])}'
-        if extension == ""
-        else f'{"__".join([name, file_size, base64.urlsafe_b64encode(photo.id.encode()).decode()])}.{extension}',
-    )
 
     if folder_format is not None:
         folder = photo.created.strftime(folder_format)
@@ -96,15 +86,16 @@ def generate_file_name(photo, file_size, destination_path, folder_format):
             else f'{"__".join([name, file_size, base64.urlsafe_b64encode(photo.id.encode()).decode()])}.{extension}',
         )
         os.makedirs(os.path.join(destination_path, folder), exist_ok=True)
+    else:
+        file_size_id_path = os.path.join(
+            destination_path,
+            f'{"__".join([name, file_size, base64.urlsafe_b64encode(photo.id.encode()).decode()])}'
+            if extension == ""
+            else f'{"__".join([name, file_size, base64.urlsafe_b64encode(photo.id.encode()).decode()])}.{extension}',
+        )
 
     file_size_id_path_norm = unicodedata.normalize("NFC", file_size_id_path)
 
-    if os.path.isfile(file_path):
-        os.rename(file_path, file_size_id_path)
-    if os.path.isfile(file_size_path):
-        os.rename(file_size_path, file_size_id_path)
-    if os.path.isfile(file_size_id_path):
-        os.rename(file_size_id_path, file_size_id_path_norm)
     return file_size_id_path_norm
 
 
@@ -137,8 +128,22 @@ def download_photo(photo, file_size, destination_path):
         return False
     return True
 
-
-def process_photo(photo, file_size, destination_path, files, folder_format):
+def create_symlink(photo, photo_path, symlinks_path, folder_format):
+    """Create symlink"""
+    # print(json.dumps(photo._master_record))
+    if "importedByBundleIdentifierEnc" in photo._master_record["fields"]:
+        importer_app = base64.b64decode(photo._master_record["fields"]["importedByBundleIdentifierEnc"]["value"]).decode()
+    else:
+        importer_app = "camera"
+    folder=None
+    if folder_format is not None:
+        folder = photo.created.strftime(folder_format)
+    symlink_folder_path = os.path.join(symlinks_path, importer_app, folder)
+    os.makedirs(symlink_folder_path, exist_ok=True)
+    symlink_src_path = os.path.join(symlink_folder_path, os.path.split(photo_path)[-1])
+    os.symlink(os.path.relpath(photo_path, symlink_folder_path), symlink_src_path)
+        
+def process_photo(photo, file_size, destination_path, files, folder_format, symlinks_path):
     """Process photo details."""
     photo_path = generate_file_name(
         photo=photo,
@@ -154,10 +159,12 @@ def process_photo(photo, file_size, destination_path, files, folder_format):
     if photo_exists(photo, file_size, photo_path):
         return False
     download_photo(photo, file_size, photo_path)
+    if symlinks_path != None: 
+        create_symlink(photo, photo_path, symlinks_path, folder_format)
     return True
 
 
-def sync_album(album, destination_path, file_sizes, extensions=None, files=None, folder_format=None):
+def sync_album(album, destination_path, symlinks_path, file_sizes, extensions=None, files=None, folder_format=None):
     """Sync given album."""
     if album is None or destination_path is None or file_sizes is None:
         return None
@@ -166,13 +173,14 @@ def sync_album(album, destination_path, file_sizes, extensions=None, files=None,
     for photo in album:
         if photo_wanted(photo, extensions):
             for file_size in file_sizes:
-                process_photo(photo, file_size, destination_path, files, folder_format)
+                process_photo(photo, file_size, destination_path, files, folder_format, symlinks_path)
         else:
             LOGGER.debug(f"Skipping the unwanted photo {photo.filename}.")
     for subalbum in album.subalbums:
         sync_album(
             album.subalbums[subalbum],
             os.path.join(destination_path, subalbum),
+            os.path.join(symlinks_path, subalbum),
             file_sizes,
             extensions,
             files,
@@ -199,6 +207,7 @@ def remove_obsolete(destination_path, files):
 def sync_photos(config, photos):
     """Sync all photos."""
     destination_path = config_parser.prepare_photos_destination(config=config)
+    symlinks_path = config_parser.prepare_photo_symlinks_destination(config=config)
     filters = config_parser.get_photos_filters(config=config)
     files = set()
     download_all = config_parser.get_photos_all_albums(config=config)
@@ -212,6 +221,7 @@ def sync_photos(config, photos):
                 sync_album(
                     album=photos.libraries[library].albums[album],
                     destination_path=os.path.join(destination_path, album),
+                    symlinks_path=os.path.join(symlinks_path),
                     file_sizes=filters["file_sizes"],
                     extensions=filters["extensions"],
                     files=files,
@@ -222,6 +232,7 @@ def sync_photos(config, photos):
                 sync_album(
                     album=photos.libraries[library].albums[album],
                     destination_path=os.path.join(destination_path, album),
+                    symlinks_path=os.path.join(symlinks_path),
                     file_sizes=filters["file_sizes"],
                     extensions=filters["extensions"],
                     files=files,
@@ -233,6 +244,7 @@ def sync_photos(config, photos):
                     sync_album(
                         album=photos.libraries[library].albums[album],
                         destination_path=os.path.join(destination_path, album),
+                        symlinks_path=os.path.join(symlinks_path),
                         file_sizes=filters["file_sizes"],
                         extensions=filters["extensions"],
                         files=files,
@@ -244,6 +256,7 @@ def sync_photos(config, photos):
             sync_album(
                 album=photos.libraries[library].all,
                 destination_path=os.path.join(destination_path, "all"),
+                symlinks_path=os.path.join(symlinks_path),
                 file_sizes=filters["file_sizes"],
                 extensions=filters["extensions"],
                 files=files,

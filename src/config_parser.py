@@ -12,6 +12,7 @@ from src import (
     DEFAULT_RETRY_LOGIN_INTERVAL_SEC,
     DEFAULT_ROOT_DESTINATION,
     DEFAULT_SYNC_INTERVAL_SEC,
+    DEFAULT_PHOTO_SYMLINKS_DESTINATION,
     get_logger,
 )
 
@@ -246,6 +247,27 @@ def prepare_photos_destination(config):
     photos_destination_path = os.path.abspath(os.path.join(prepare_root_destination(config=config), photos_destination))
     os.makedirs(photos_destination_path, exist_ok=True)
     return photos_destination_path
+
+def prepare_photo_symlinks_destination(config):
+    """Prepare photo symlinks destination path."""
+    LOGGER.debug("Checking photo symlinks destination ...")
+    symlinks_destination = DEFAULT_PHOTO_SYMLINKS_DESTINATION
+    config_path = ["photo_symlinks", "create"]
+    if not traverse_config_path(config=config, config_path=config_path):
+        return None
+    elif not get_config_value(config=config, config_path=config_path):
+        return None
+    config_path = ["photo_symlinks", "destination"]
+    if not traverse_config_path(config=config, config_path=config_path):
+        LOGGER.warning(
+            f"Warning: destination is missing in {symlinks_destination}."
+            + f" Using default symlinks destination: {config_path_to_string(config_path)}",
+        )
+    else:
+        symlinks_destination = get_config_value(config=config, config_path=config_path)
+    symlinks_destination_path = os.path.abspath(os.path.join(prepare_root_destination(config=config), symlinks_destination))
+    os.makedirs(symlinks_destination_path, exist_ok=True)
+    return symlinks_destination_path
 
 
 def get_photos_remove_obsolete(config):
