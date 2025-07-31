@@ -83,6 +83,9 @@ app:
   telegram:
   # bot_token: <your Telegram bot token>
   # chat_id: <your Telegram user or chat ID>
+  pushover:
+  # user_key: <your Pushover user key>
+  # api_token: <your Pushover api token>
   smtp:
     ## If you want to receive email notifications about expired/missing 2FA credentials then uncomment
     # email: "user@test.com"
@@ -96,6 +99,7 @@ app:
   region: global # For China server users, set this to - china (default: global)
 drive:
   destination: "drive"
+  # Remove local files that are not present on server (i.e. files delete on server)
   remove_obsolete: false
   sync_interval: 300
   filters: # Optional - use it only if you want to download specific folders.
@@ -116,6 +120,7 @@ drive:
     - "*.md"
 photos:
   destination: "photos"
+  # Remove local photos that are not present on server (i.e. photos delete on server)
   remove_obsolete: false
   sync_interval: 500
   all_albums: false # Optional, default false. If true preserve album structure. If same photo is in multiple albums creates duplicates on filesystem
