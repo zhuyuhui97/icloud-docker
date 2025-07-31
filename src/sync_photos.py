@@ -152,7 +152,7 @@ def create_symlink(photo, photo_path, symlinks_path, folder_format):
     else:
         if (os.path.isdir(symlink_dst_path)):
             os.rmdir(symlink_dst_path)
-        else:
+        elif (os.path.isfile(symlink_dst_path)):
             os.remove(symlink_dst_path)
         LOGGER.debug(f"File or directory at symlink path {symlink_dst_path}, deleted.")      
     os.symlink(symlink_src_path, symlink_dst_path)
