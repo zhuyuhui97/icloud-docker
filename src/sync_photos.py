@@ -140,8 +140,11 @@ def create_symlink(photo, photo_path, symlinks_path, folder_format):
         folder = photo.created.strftime(folder_format)
     symlink_folder_path = os.path.join(symlinks_path, importer_app, folder)
     os.makedirs(symlink_folder_path, exist_ok=True)
-    symlink_src_path = os.path.join(symlink_folder_path, os.path.split(photo_path)[-1])
-    os.symlink(os.path.relpath(photo_path, symlink_folder_path), symlink_src_path)
+    symlink_dst_path = os.path.join(symlink_folder_path, os.path.split(photo_path)[-1])
+    symlink_src_path = os.path.relpath(photo_path, symlink_folder_path)
+    if (os.path.exists(symlink_src_path)):
+        os.remove(symlink_src_path)
+    os.symlink(symlink_src_path, symlink_dst_path)
         
 def process_photo(photo, file_size, destination_path, files, folder_format, symlinks_path):
     """Process photo details."""
