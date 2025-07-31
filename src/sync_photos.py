@@ -142,20 +142,19 @@ def create_symlink(photo, photo_path, symlinks_path, folder_format):
     os.makedirs(symlink_folder_path, exist_ok=True)
     symlink_dst_path = os.path.join(symlink_folder_path, os.path.split(photo_path)[-1])
     symlink_src_path = os.path.relpath(photo_path, symlink_folder_path)
-    if os.path.exists(symlink_src_path):
-        if (not os.path.islink(symlink_src_path)):
-            if (os.path.isdir(symlink_src_path)):
-                os.rmdir(symlink_src_path)
-            else:
-                os.remove(symlink_src_path)
-            LOGGER.debug(f"File or directory at symlink path {symlink_src_path}, deleted.")
-        else: # It is a symlink, check if linked correctly
-            if os.readlink(symlink_src_path)!=symlink_dst_path:
-                os.remove(symlink_src_path)
-                LOGGER.info(f"Symlink {symlink_src_path} pointed to a wrong dst, deleted.")
-            else:
-                LOGGER.debug(f"Symlink {symlink_src_path} ok, skipping.")
-                return
+    if os.path.islink(symlink_src_path):
+        if os.readlink(symlink_src_path)!=symlink_dst_path:
+            os.remove(symlink_src_path)
+            LOGGER.info(f"Symlink {symlink_src_path} pointed to a wrong dst, deleted.")
+        else:
+            LOGGER.debug(f"Symlink {symlink_src_path} ok, skipping.")
+            return
+    else:
+        if (os.path.isdir(symlink_src_path)):
+            os.rmdir(symlink_src_path)
+        else:
+            os.remove(symlink_src_path)
+        LOGGER.debug(f"File or directory at symlink path {symlink_src_path}, deleted.")      
     os.symlink(symlink_src_path, symlink_dst_path)
     LOGGER.info(f"Created symlink {symlink_src_path}.")
 
