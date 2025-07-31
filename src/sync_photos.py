@@ -142,9 +142,24 @@ def create_symlink(photo, photo_path, symlinks_path, folder_format):
     os.makedirs(symlink_folder_path, exist_ok=True)
     symlink_dst_path = os.path.join(symlink_folder_path, os.path.split(photo_path)[-1])
     symlink_src_path = os.path.relpath(photo_path, symlink_folder_path)
-    if (os.path.exists(symlink_src_path)):
-        os.remove(symlink_src_path)
+    if os.path.exists(symlink_src_path):
+        if (not os.path.islink(symlink_src_path)):
+            if (os.path.isdir(symlink_src_path)):
+                os.rmdir(symlink_src_path)
+            else:
+                os.remove(symlink_src_path)
+            LOGGER.debug(f"File or directory at symlink path {symlink_src_path}, deleted.")
+        else: # It is a symlink, check if linked correctly
+            if os.readlink(symlink_src_path)!=symlink_dst_path:
+                os.remove(symlink_src_path)
+                LOGGER.info(f"Symlink {symlink_src_path} pointed to a wrong dst, deleted.")
+            else:
+                LOGGER.debug(f"Symlink {symlink_src_path} ok, skipping.")
+                return
     os.symlink(symlink_src_path, symlink_dst_path)
+    LOGGER.info(f"Created symlink {symlink_src_path}.")
+
+
         
 def process_photo(photo, file_size, destination_path, files, folder_format, symlinks_path):
     """Process photo details."""
@@ -160,9 +175,10 @@ def process_photo(photo, file_size, destination_path, files, folder_format, syml
     if files is not None:
         files.add(photo_path)
     if photo_exists(photo, file_size, photo_path):
+        create_symlink(photo, photo_path, symlinks_path, folder_format)
         return False
-    download_photo(photo, file_size, photo_path)
-    if symlinks_path != None: 
+    dl_succeed = download_photo(photo, file_size, photo_path)
+    if dl_succeed and symlinks_path != None: 
         create_symlink(photo, photo_path, symlinks_path, folder_format)
     return True
 
